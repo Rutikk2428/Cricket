@@ -26,6 +26,7 @@ export const ScoringScreen: React.FC<ScoringScreenProps> = ({
   
   // Animation State
   const [anim, setAnim] = useState<{ type: '4' | '6' | 'W' | null, key: number }>({ type: null, key: 0 });
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Auto-scroll current over history
   useEffect(() => {
@@ -37,18 +38,37 @@ export const ScoringScreen: React.FC<ScoringScreenProps> = ({
   // Clear animation after delay
   useEffect(() => {
     if (anim.type) {
-      const timer = setTimeout(() => setAnim({ type: null, key: 0 }), 1500);
+      // Keep animation visible for 1.2s
+      const timer = setTimeout(() => {
+        setAnim({ type: null, key: 0 });
+        setIsProcessing(false);
+      }, 1200);
       return () => clearTimeout(timer);
     }
   }, [anim]);
 
   const handleInput = (runs: number, isWicket: boolean, isExtra: boolean) => {
-    // Trigger Animation
-    if (isWicket) setAnim({ type: 'W', key: Date.now() });
-    else if (runs === 4) setAnim({ type: '4', key: Date.now() });
-    else if (runs === 6) setAnim({ type: '6', key: Date.now() });
+    if (isProcessing) return; // Prevent double taps
 
-    onBall(runs, isWicket, isExtra);
+    const isHighImpact = isWicket || runs === 4 || runs === 6;
+
+    if (isHighImpact) {
+      setIsProcessing(true);
+      
+      // Trigger Visuals immediately
+      if (isWicket) setAnim({ type: 'W', key: Date.now() });
+      else if (runs === 4) setAnim({ type: '4', key: Date.now() });
+      else if (runs === 6) setAnim({ type: '6', key: Date.now() });
+
+      // Delay the logic update so the user sees the animation before any potential screen change
+      setTimeout(() => {
+        onBall(runs, isWicket, isExtra);
+        // We do not clear isProcessing here, it clears when animation ends in useEffect
+      }, 800); 
+    } else {
+      // Immediate update for normal balls
+      onBall(runs, isWicket, isExtra);
+    }
   };
 
   const oversDone = Math.floor(validBalls / 6);
@@ -107,21 +127,21 @@ export const ScoringScreen: React.FC<ScoringScreenProps> = ({
       
       {/* Animation Overlay */}
       {anim.type && (
-        <div key={anim.key} className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none bg-black/70 backdrop-blur-sm animate-fade-in">
+        <div key={anim.key} className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none bg-black/80 backdrop-blur-md animate-fade-in">
            <div className={`flex flex-col items-center justify-center transform ${
               anim.type === 'W' ? 'animate-shake' : 
               anim.type === '6' ? 'animate-pop' : 
               'animate-slide-up'
            }`}>
-              <div className={`text-[8rem] font-black italic tracking-tighter leading-none drop-shadow-2xl ${
+              <div className={`text-[8rem] font-black italic tracking-tighter leading-none drop-shadow-2xl filter ${
                   anim.type === 'W' ? 'text-[#f91880]' : 
                   anim.type === '6' ? 'text-[#00ba7c]' : 
                   'text-[#1d9bf0]'
               }`}>
-                  {anim.type === 'W' ? 'OUT' : anim.type === '4' ? 'FOUR' : 'SIX'}
+                  {anim.type === 'W' ? 'OUT' : anim.type === '4' ? '4' : '6'}
               </div>
-              <div className="text-2xl font-bold text-white uppercase tracking-[0.5em] mt-2 animate-pulse">
-                {anim.type === 'W' ? 'Wicket!' : anim.type === '4' ? 'Boundary!' : 'Maximum!'}
+              <div className="text-3xl font-bold text-white uppercase tracking-[0.3em] mt-4 animate-pulse">
+                {anim.type === 'W' ? 'Wicket' : anim.type === '4' ? 'Boundary' : 'Maximum'}
               </div>
            </div>
         </div>
@@ -189,7 +209,6 @@ export const ScoringScreen: React.FC<ScoringScreenProps> = ({
                     {[...oversHistory].reverse().map((over, idx) => {
                       const overNum = oversHistory.length - idx;
                       const runsInOver = over.reduce((acc, b) => acc + b.runs + (b.isExtra ? 1 : 0), 0);
-                      const wktsInOver = over.filter(b => b.isWicket).length;
                       
                       return (
                         <div key={overNum} className="flex items-center justify-between p-3 rounded-2xl border border-[#2f3336] bg-[#16181c]/50">
@@ -216,28 +235,30 @@ export const ScoringScreen: React.FC<ScoringScreenProps> = ({
       {/* Sticky Bottom Keypad */}
       <div className="fixed bottom-0 w-full max-w-lg bg-black border-t border-[#2f3336] p-4 pb-6 backdrop-blur-xl bg-black/95">
          <div className="grid grid-cols-4 gap-3 mb-3">
-            <Button variant="secondary" className="h-14 text-xl" onClick={() => handleInput(0, false, false)}>0</Button>
-            <Button variant="secondary" className="h-14 text-xl" onClick={() => handleInput(1, false, false)}>1</Button>
-            <Button variant="secondary" className="h-14 text-xl" onClick={() => handleInput(2, false, false)}>2</Button>
-            <Button variant="secondary" className="h-14 text-xl" onClick={() => handleInput(3, false, false)}>3</Button>
+            <Button disabled={isProcessing} variant="secondary" className="h-14 text-xl" onClick={() => handleInput(0, false, false)}>0</Button>
+            <Button disabled={isProcessing} variant="secondary" className="h-14 text-xl" onClick={() => handleInput(1, false, false)}>1</Button>
+            <Button disabled={isProcessing} variant="secondary" className="h-14 text-xl" onClick={() => handleInput(2, false, false)}>2</Button>
+            <Button disabled={isProcessing} variant="secondary" className="h-14 text-xl" onClick={() => handleInput(3, false, false)}>3</Button>
          </div>
          <div className="grid grid-cols-4 gap-3">
             <Button 
+                disabled={isProcessing}
                 className="h-14 text-xl bg-[#1d9bf0] hover:bg-[#1a8cd8] text-white border-transparent" 
                 onClick={() => handleInput(4, false, false)}
             >4</Button>
             <Button 
+                disabled={isProcessing}
                 className="h-14 text-xl bg-[#00ba7c] hover:bg-[#00a26b] text-white border-transparent" 
                 onClick={() => handleInput(6, false, false)}
             >6</Button>
-            <Button variant="danger" className="h-14 text-xl font-black" onClick={() => handleInput(0, true, false)}>W</Button>
-            <Button variant="outline" className="h-14 text-sm font-bold" onClick={() => handleInput(1, false, true)}>+1</Button>
+            <Button disabled={isProcessing} variant="danger" className="h-14 text-xl font-black" onClick={() => handleInput(0, true, false)}>W</Button>
+            <Button disabled={isProcessing} variant="outline" className="h-14 text-sm font-bold" onClick={() => handleInput(1, false, true)}>+1</Button>
          </div>
          
          <div className="mt-4 flex justify-center">
              <button 
                 onClick={onUndo} 
-                disabled={inningsState.validBalls === 0 && inningsState.runs === 0 && inningsState.wickets === 0}
+                disabled={isProcessing || (inningsState.validBalls === 0 && inningsState.runs === 0 && inningsState.wickets === 0)}
                 className="flex items-center space-x-2 text-[#71767b] hover:text-[#e7e9ea] disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-xs font-bold uppercase tracking-widest py-2 px-4"
              >
                 <RotateCcw size={12} />
