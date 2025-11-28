@@ -1,0 +1,5 @@
+{
+  "name": "Cricket Lite Scorer",
+  "description": "An ultra-simple, distraction-free cricket scorer designed for street games and casual matches. Features clean mobile-first UI, over tracking, and automatic target calculations.",
+  "requestFramePermissions": []
+}
